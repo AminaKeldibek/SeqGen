@@ -5,7 +5,7 @@ from initialization import xavier_weight_init
 
 def init_params(n_a, n_x, n_y):
     '''
-    Initializes RNN model parameters.
+    Initializes RNN model params.
 
     Args:
         n_a: size of hidden layer
@@ -41,6 +41,9 @@ def rnn_fwd_one_step(params, a_prev, x):
 
     Args:
         x: one-hot vector of shape (vocab_size, 1)
+    Returns:
+        a_next: numpy vector of shape (n_a, 1)
+        y_hat: numpy vector of shape (vocab_size, 1)
     '''
     Wax, Waa, Wya = params['Wax'], params['Waa'], params['Wya']
     ba, by = params['ba'], params['by']
@@ -91,6 +94,41 @@ def calc_cost(y_hat, Y):
     return loss
 
 
-def rnn_bwd(X, Y, params, cache):
-    grads = {'dWya': 0, 'dby': 0, 'dWax': 0, 'dWaa': 0, 'dba': 0}
+def rnn_bwd_one_step(dy, grads, params, x, a, a_prev):
+    grads['dWya'] += np.dot(dy, a.T)
+    grads['dby'] += dy
+    da = np.dot(params['Wya'].T, dy) + grads['da_next'] # backprop into h
+    daraw = (1 - a * a) * da # backprop through tanh nonlinearity
+    grads['dba'] += daraw
+    grads['dWax'] += np.dot(daraw, x.T)
+    grads['dWaa'] += np.dot(daraw, a_prev.T)
+    grads['da_next'] = np.dot(params['Waa'].T, daraw)
+
     return grads
+
+
+def rnn_bwd(Y, params, cache):
+    grads = {}
+    x, a, y_hat = cache['x'], cache['a'], cache['y_hat']
+
+    Waa, Wax, Wya, by, ba = params['Waa'], params['Wax'], params['Wya'], params['by'], params['ba']
+    grads['dWax'], grads['dWaa'], grads['dWya'] = np.zeros_like(Wax), np.zeros_like(Waa), np.zeros_like(Wya)
+    grads['dba'], grads['dby'] = np.zeros_like(ba), np.zeros_like(by)
+    grads['da_next'] = np.zeros_like(a[0])
+
+    for t in reversed(range(len(Y))):
+        dy = np.copy(y_hat[t])
+        dy[Y[t]] -= 1
+        grads = rnn_bwd_one_step(dy, grads, params, x[t], a[t], a[t - 1])
+
+    return grads
+
+
+def update_params(params, grads, learn_rate):
+    params['Wax'] -= learn_rate * grads['dWax']
+    params['Waa'] -= learn_rate * grads['dWaa']
+    params['Wya'] -= learn_rate * grads['dWya']
+    params['ba'] -= learn_rate * grads['dba']
+    params['by'] -= learn_rate * grads['dby']
+
+    return params
