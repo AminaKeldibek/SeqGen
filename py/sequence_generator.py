@@ -2,11 +2,15 @@ import numpy as np
 from rnn_model import rnn_fwd_one_step
 
 
-def sample(y_hat):
-    return np.argmax(y_hat)
+def sample(y_hat, sample_method):
+    if sample_method == 'random':
+        return np.random.choice(len(y_hat), p=y_hat[:, 0])
+    if sample_method == "max":
+        return np.argmax(y_hat)
 
 
-def gen_sequence(params, max_seq_len, termin_elem, a_0, x_0):
+def gen_sequence(params, max_seq_len, termin_elem, a_0, x_0,
+                 sample_method='max'):
     '''
     Generates sequence from trained model of given size.
     Args:
@@ -25,7 +29,7 @@ def gen_sequence(params, max_seq_len, termin_elem, a_0, x_0):
 
     while (elem != termin_elem | len(sequence) < max_seq_len):
         a_prev, y_hat = rnn_fwd_one_step(params, a_prev, x)
-        elem = sample(y_hat)
+        elem = sample(y_hat, sample_method)
         sequence.append(elem)
 
         x = np.zeros_like(x)
